@@ -97,7 +97,7 @@ gdb启动后，查看pc寄存器和后2条指令的情况：
 ![](http://i.imgur.com/m0aZ1ng.png)
 
 #### 2.在初始化位置0x7c00设置实地址断点,测试断点正常。
-在0x7c00设置断点
+运行make debug，在0x7c00设置断点
 
 	(gdb) b *0x7c00
 	Breakpoint 1 at 0x7c00
@@ -216,7 +216,7 @@ gdb启动后，查看pc寄存器和后2条指令的情况：
 
 	lgdt gdtdesc
 
-4.置cr0寄存器的最低位为1：
+4.置cr0寄存器的最低位为1，进入保护模式：
 
     movl %cr0, %eax
     orl $CR0_PE_ON, %eax
@@ -331,4 +331,52 @@ waitdisc函数用来等待磁盘扇区就绪，方法是一直查看0x1F7处的�
 
 中断向量表一个表项占用8字节；该表项的2-3字节是段选择子，0-1字节和6-7字节拼成位移；中断处理程序的入口地址由两者联合构成。
 
-### 扩展练习Challenge1与2：见代码
+### 扩展练习（需要编程）
+
+#### Challenge1：扩展proj4,增加syscall功能，即增加一用户态函数（可执行一特定系统调用：获得时钟计数值），当内核初始完毕后，可从内核态返回到用户态的函数，而用户态的函数又通过系统调用得到内核态的服务
+
+我在init.c里增加了两个函数的实现，lab1\_switch\_to\_user和lab1\_switch\_to\_kernel
+
+	static void
+	lab1_switch_to_user(void) {
+	    //LAB1 CHALLENGE 1 : TODO
+	    asm volatile (
+	        "sub $0x8, %%esp \n"
+	        "int %0 \n"
+	        "movl %%ebp, %%esp"
+	        : 
+	        : "i"(T_SWITCH_TOU)
+	    );
+	}
+	
+在上面的lab1\_switch\_to\_user函数实现中，根据需要我先触发T\_SWITCH\_TOU中断。 由于从中断返回时，会多pop两位，并用这两位的值恢复ss,sp。 所以要先把栈压入两位，并在从中断返回后恢复esp，避免破坏堆栈。
+
+	static void
+	lab1_switch_to_kernel(void) {
+	    //LAB1 CHALLENGE 1 :  TODO
+	    asm volatile (
+	        "int %0 \n"
+	        "movl %%ebp, %%esp \n"
+	        : 
+	        : "i"(T_SWITCH_TOK)
+	    );
+	}
+
+
+类似的，在lab1\_switch\_to\_kernel中，触发T\_SWITCH\_TOK中断。 注意从中断返回时，esp仍在堆栈中，所以要在从中断返回后恢复esp。
+
+	case T_SWITCH_TOU:
+        if (tf->tf_cs != USER_CS)
+        {
+            ......
+        }
+        break;
+    case T_SWITCH_TOK:
+        //panic("T_SWITCH_** ??\n");
+        if (tf->tf_cs != KERNEL_CS)
+        {
+            ......
+        }
+        break;
+
+最后，如上面代码所示，还要在trap.c文件中的trap_dispatch函数里增加对上述两个中断的处理，其处理思路主要是设置各个寄存器，调整io所需权限。具体代码见lab1工程，报告里不作展开。
