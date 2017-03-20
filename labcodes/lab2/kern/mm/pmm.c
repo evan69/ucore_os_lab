@@ -347,7 +347,7 @@ pmm_init(void) {
 // return vaule: the kernel virtual address of this pte
 pte_t *
 get_pte(pde_t *pgdir, uintptr_t la, bool create) {
-    /* LAB2 EXERCISE 2: YOUR CODE
+    /* LAB2 EXERCISE 2: 2014011433
      *
      * If you need to visit a physical address, please use KADDR()
      * please read pmm.h for useful macros
@@ -379,6 +379,40 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
                           // (7) set page directory entry's permission
     }
     return NULL;          // (8) return page table entry
+#endif
+#if 1
+    uint32_t pde_index = PDX(la);
+    //get offset
+    pde_t* pde_entry_addr = pgdir + pde_index;
+    //get pde entry by base addr and offset
+    pde_t pde_entry_data = *pde_entry_addr;
+    if(!(pde_entry_data & PTE_P))
+    //if not present
+    {
+        struct Page *page = alloc_page();
+        //try to alloc page for PTE
+        if (!create || page == NULL) 
+        //fail or forbidden by the parameter
+        {
+            return NULL;
+        }
+        else
+        {
+            uintptr_t pa = page2pa(page);
+            //get pa of the page
+            *pde_entry_addr = pa | PTE_U | PTE_W | PTE_P;
+            //set bit of PDE
+            set_page_ref(page, 1);
+            //set page ref
+        }
+    }
+    pde_entry_data = *pde_entry_addr;
+    //update pde entry data
+    pte_t* pte_base = PDE_ADDR(pde_entry_data);
+    //get base of pte from pde entry
+    uint32_t pte_index = PTX(la);
+    //get pte offset
+    return (pte_t *)KADDR(pte_base) + pte_index;
 #endif
 }
 
