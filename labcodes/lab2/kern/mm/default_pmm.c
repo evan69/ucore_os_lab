@@ -190,7 +190,6 @@ default_free_pages(struct Page *base, size_t n) {
 
     nr_free += n;
     // update nr_free
-    return ;
 }
 
 static size_t
