@@ -67,21 +67,6 @@ default_init(void) {
 
 static void
 default_init_memmap(struct Page *base, size_t n) {
-    /*
-    assert(n > 0);
-    struct Page *p = base;
-    for (; p != base + n; p ++) {
-        assert(PageReserved(p));
-        SetPageProperty(p);
-        p->flags = p->property = 0;
-        set_page_ref(p, 0);
-        list_add_before(&free_list, &(p->page_link));
-    }
-    base->property = n;
-    //SetPageProperty(base);
-    nr_free += n;
-    //list_add(&free_list, &(base->page_link));
-    */
     assert(n > 0);
     struct Page *p = base;
     for (; p != base + n; p ++) {
@@ -103,8 +88,7 @@ default_alloc_pages(size_t n) {
     if (n > nr_free) {
         return NULL;
     } //there are no more than n pages -> fail
-    //list_entry_t *le, *len;
-    //le = &free_list;
+    struct Page *ret = NULL;
     list_entry_t *le = &free_list;
     while((le=list_next(le)) != &free_list) 
     {
@@ -112,32 +96,36 @@ default_alloc_pages(size_t n) {
         struct Page *p = le2page(le, page_link);
         //cprintf("0x%08x \n", p);
         if(p->property >= n)
+        // find a page with more than n free pages after it
         {
             int i = 0;
-            for(i=0;i<n;i++)
+            while(i < n)
             {
-                //init every page after finding n pages
-                //len = list_next(le);
+                //init every page after finding more than n pages
                 struct Page *pp = le2page(le, page_link);
                 SetPageReserved(pp);
                 ClearPageProperty(pp);
+                //set and clear
                 list_del(le);
+                //delete from list
                 le = list_next(le);
+                //move to next page
+                i++;
             }
-            if(p->property>n)
+            if(p->property > n)
             {
                 struct Page* le_page = (le2page(le,page_link));
                 le_page->property = p->property - n;
+                // set property
             }
-            ClearPageProperty(p);
-            SetPageReserved(p);
-            // set page attribute
             nr_free -= n;
             // update nr_free
-            return p;
+            ret = p;
+            // set return variable
+            break;
         }
     }
-    return NULL;
+    return ret;
 }
 
 static void
