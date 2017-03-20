@@ -132,7 +132,64 @@ static void
 default_free_pages(struct Page *base, size_t n) {
     assert(n > 0);
     assert(PageReserved(base));
-    //nr_free += n;
+    list_entry_t *le = &free_list;
+    struct Page * p_last = NULL,* p_next = NULL;
+    //p_next : page with higher address than base
+    //p_last : page with  lower address than base
+    while((le=list_next(le)) != &free_list) 
+    {
+        p_next = le2page(le, page_link);
+        if(p_next > base)
+        {
+            p_last = le2page(list_prev(le),page_link);
+            break;
+        }
+    }// use while loop to find p_next and p_last
+    struct Page* p = p_next;
+    for(p = base;p < base+n;p++)
+    {
+        list_add_before(le, &(p->page_link));
+    }// add n pages into the list (between p_next and p_last)
+    base->flags = 0;
+    set_page_ref(base, 0);
+    ClearPageProperty(base);
+    SetPageProperty(base);
+    base->property = n;
+    // set attributes
+
+    p = base;
+    if(base - 1 == p_last)
+    //merge base and p_last
+    {
+        base->property = 0;
+        // base changes to a non-head page
+        le = &(p_last->page_link);
+        p = p_last;
+        while(le!=&free_list)
+        {
+            //find the head of p_last 
+            if(p->property > 0)
+            {
+                p->property += n;
+                // update property of the head
+                break;
+            }
+            le = list_prev(le);
+            p = le2page(le,page_link);
+        }
+    }
+
+    //p is the head lower than p_next at this time
+
+    if(base + n == p_next)
+    //merge p and p_next
+    {
+        p->property += p_next->property;
+        p_next->property = 0;
+    }
+
+    nr_free += n;
+    // update nr_free
     return ;
 }
 
