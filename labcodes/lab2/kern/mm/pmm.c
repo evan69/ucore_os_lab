@@ -462,6 +462,8 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
     if(!*ptep & PTE_P)
     //check if this page table entry is present
         return;
+    *ptep = *ptep | PTE_P;
+    //change the page table/directory entry flags bit to 1 (not present)
     struct Page *page = pte2page(*ptep);
     //find corresponding page to pte
     uint32_t page_ref = page_ref_dec(page);
