@@ -13,14 +13,14 @@ gcc -Iboot/ -fno-builtin -Wall -ggdb -m32 -gstabs -nostdinc  -fno-stack-protecto
 </pre>
 将调用gcc工具，把C代码编译为.o的目标文件，用到的参数说明如下：
 
-	-ggdb  生成可供gdb使用的调试信息。这样才能用qemu+gdb来调试bootloader or ucore。
-	-m32  生成适用于32位环境的代码。我们用的模拟硬件是32bit的80386，所以ucore也要是32位的软件。
-	-gstabs  生成stabs格式的调试信息。这样要ucore的monitor可以显示出便于开发者阅读的函数调用栈信息
-	-nostdinc  不使用标准库。标准库是给应用程序用的，我们是编译ucore内核，OS内核是提供服务的，所以所有的服务要自给自足。
-	-fno-stack-protector  不生成用于检测缓冲区溢出的代码。这是for 应用程序的，我们是编译内核，ucore内核好像还用不到此功能。
-	-Os  为减小代码大小而进行优化。根据硬件spec，主引导扇区只有512字节，我们写的简单bootloader的最终大小不能大于510字节。
-	-I<dir>  添加搜索头文件的路径
-	-fno-builtin  除非用__builtin_前缀，否则不进行builtin函数的优化
+	- -ggdb  生成可供gdb使用的调试信息。这样才能用qemu+gdb来调试bootloader or ucore。
+	- -m32  生成适用于32位环境的代码。我们用的模拟硬件是32bit的80386，所以ucore也要是32位的软件。
+	- -gstabs  生成stabs格式的调试信息。这样要ucore的monitor可以显示出便于开发者阅读的函数调用栈信息
+	- -nostdinc  不使用标准库。标准库是给应用程序用的，我们是编译ucore内核，OS内核是提供服务的，所以所有的服务要自给自足。
+	- -fno-stack-protector  不生成用于检测缓冲区溢出的代码。这是for 应用程序的，我们是编译内核，ucore内核好像还用不到此功能。
+	- -Os  为减小代码大小而进行优化。根据硬件spec，主引导扇区只有512字节，我们写的简单bootloader的最终大小不能大于510字节。
+	- -I<dir\>  添加搜索头文件的路径
+	- -fno-builtin  除非用__builtin_前缀，否则不进行builtin函数的优化
 
 - 命令
 <pre>
@@ -28,11 +28,11 @@ ld -m elf_i386 -nostdlib -N -e start -Ttext 0x7C00 obj/boot/bootasm.o obj/boot/b
 </pre>
 将目标文件转化为执行程序（如bootloader执行程序），用到的参数说明如下：
 
-	-m <emulation>  模拟为i386上的连接器
-	-nostdlib  不使用标准库
-	-N  设置代码段和数据段均可读写
-	-e <entry>  指定入口
-	-Ttext  制定代码段开始位置
+	- -m <emulation\>  模拟为i386上的连接器
+	- -nostdlib  不使用标准库
+	- -N  设置代码段和数据段均可读写
+	- -e <entry\>  指定入口
+	- -Ttext  制定代码段开始位置
 
 - 命令
 <pre>
