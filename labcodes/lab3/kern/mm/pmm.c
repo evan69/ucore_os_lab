@@ -412,6 +412,7 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
         else
         {
             uintptr_t pa = page2pa(page);
+        	memset(KADDR(pa), 0, PGSIZE);
             //get pa of the page
             *pde_entry_addr = pa | PTE_U | PTE_W | PTE_P;
             //set bit of PDE
