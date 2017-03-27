@@ -414,10 +414,23 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
     else
     {
         if(swap_init_ok)
+        //can swap
         {
             struct Page* page = NULL;
-            swap_in(mm,addr,&page);
-            //if(page_insert(mm->pgdir,))
+            if(swap_in(mm,addr,&page))
+            {
+                goto failed;
+            }//load data from disk to a page with phy addr
+            if(page_insert(mm->pgdir,page,addr,perm))
+            {
+                goto failed;
+            }//According to the mm, addr AND page, setup the map of phy addr <---> logical addr
+            if(swap_map_swappable(mm,addr,page,1))
+            {
+                goto failed;
+            }//make the page swappable.
+            page->pra_vaddr = addr;
+            //why this line necessary?
         }
         else
         {
