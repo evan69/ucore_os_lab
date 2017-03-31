@@ -52,7 +52,7 @@ _fifo_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page, int
     /*LAB3 EXERCISE 2: 2014011433*/ 
     //(1)link the most recent arrival page at the back of the pra_list_head qeueue.
 
-    list_add_after(head,entry);
+    list_add_before(head,entry);
     //link the most recent arrival page at the back of the pra_list_head qeueue.
     return 0;
 }
@@ -71,7 +71,7 @@ _fifo_swap_out_victim(struct mm_struct *mm, struct Page ** ptr_page, int in_tick
      //(1)  unlink the  earliest arrival page in front of pra_list_head qeueue
      //(2)  set the addr of addr of this page to ptr_page
 
-     list_entry_t *entry = list_prev(head);
+     list_entry_t *entry = list_next(head);
      //choose the victim
      list_del(entry);
      //unlink the earliest arrival page in front of pra_list_head qeueue
