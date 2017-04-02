@@ -18,12 +18,7 @@
 
 答：我在kern/mm/vmm.c中，给未被映射的地址映射物理页，添加如下代码：
 
-	ptep = get_pte(mm->pgdir,addr,1);
-    if(ptep ==  NULL)
-    {
-        cprintf("create pte failed");
-        goto failed;
-    }
+    ptep = get_pte(mm->pgdir,addr,1);
 
     if(*ptep == 0)
     {
@@ -41,7 +36,6 @@
 整个过程大致分为以下几步
 
 - 首先调用get\_pte函数，从虚拟地址获取PTE；
-- 检查PTE，若为NULL，则跳转到fail；
 - 检查PTE，若其保存的是空指针，则调用pgdir\_alloc\_page分配物理页面；
 - 若分配失败，则跳转到fail
 
@@ -55,7 +49,14 @@
 
 ### 本练习与答案比较：
 
-答：我的实现思路和给出的答案思路基本一样。
+答：答案检查了get\_pte函数是否得到了想要的结果：
+
+	if ((ptep = get_pte(mm->pgdir, addr, 1)) == NULL) {
+        cprintf("get_pte in do_pgfault failed\n");
+        goto failed;
+    }
+
+而我并没有做这个检查。经过测试，并不影响最终结果。
 
 ## 练习2：补充完成基于FIFO的页面替换算法（需要编程）
 
