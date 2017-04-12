@@ -363,7 +363,7 @@ pmm_init(void) {
 // return vaule: the kernel virtual address of this pte
 pte_t *
 get_pte(pde_t *pgdir, uintptr_t la, bool create) {
-    /* LAB2 EXERCISE 2: YOUR CODE
+    /* LAB2 EXERCISE 2: 2014011433
      *
      * If you need to visit a physical address, please use KADDR()
      * please read pmm.h for useful macros
@@ -396,6 +396,41 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
     }
     return NULL;          // (8) return page table entry
 #endif
+#if 1
+    uint32_t pde_index = PDX(la);
+    //get offset
+    pde_t* pde_entry_addr = pgdir + pde_index;
+    //get pde entry by base addr and offset
+    pde_t pde_entry_data = *pde_entry_addr;
+    if(!(pde_entry_data & PTE_P))
+    //if not present
+    {
+        struct Page *page = alloc_page();
+        //try to alloc page for PTE
+        if (!create || page == NULL) 
+        //fail or forbidden by the parameter
+        {
+            return NULL;
+        }
+        else
+        {
+            uintptr_t pa = page2pa(page);
+        	memset(KADDR(pa), 0, PGSIZE);
+            //get pa of the page
+            *pde_entry_addr = pa | PTE_U | PTE_W | PTE_P;
+            //set bit of PDE
+            set_page_ref(page, 1);
+            //set page ref
+        }
+    }
+    pde_entry_data = *pde_entry_addr;
+    //update pde entry data
+    pte_t* pte_base = PDE_ADDR(pde_entry_data);
+    //get base of pte from pde entry
+    uint32_t pte_index = PTX(la);
+    //get pte offset
+    return (pte_t *)KADDR(pte_base) + pte_index;
+#endif
 }
 
 //get_page - get related Page struct for linear address la using PDT pgdir
@@ -416,7 +451,7 @@ get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store) {
 //note: PT is changed, so the TLB need to be invalidate 
 static inline void
 page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
-    /* LAB2 EXERCISE 3: YOUR CODE
+    /* LAB2 EXERCISE 3: 2014011433
      *
      * Please check if ptep is valid, and tlb must be manually updated if mapping is updated
      *
@@ -441,6 +476,23 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
                                   //(6) flush tlb
     }
 #endif
+    if(!*ptep & PTE_P)
+    //check if this page table entry is present
+        return;
+    *ptep = *ptep | PTE_P;
+    //change the page table/directory entry flags bit to 1 (not present)
+    struct Page *page = pte2page(*ptep);
+    //find corresponding page to pte
+    uint32_t page_ref = page_ref_dec(page);
+    //decrease page reference
+    if (page_ref == 0)
+    //free this page when page reference reachs 0
+    {
+        free_pages(page,1);
+    }
+    *ptep = NULL;
+    tlb_invalidate(pgdir,la);
+    //clear tlb
 }
 
 void
