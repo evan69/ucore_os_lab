@@ -119,6 +119,7 @@ alloc_proc(void) {
       //memset(proc->tf,0,sizeof(struct trapframe));
       memset(proc->name,0,PROC_NAME_LEN + 1);
 
+      //add two lines :
       proc->wait_state = 0;
       proc->cptr = proc->optr = proc->yptr = NULL;
     }
@@ -411,6 +412,7 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     if(proc == 0)
       goto fork_out;
     proc->parent =  current;
+    //add this line :
     assert(current->wait_state == 0);
     //step 1 : call alloc_proc to allocate a proc_struct
     int kstack_ret = setup_kstack(proc);
@@ -429,6 +431,7 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     hash_proc(proc);
     //list_add(&proc_list,&proc->list_link);
     //nr_process++;
+    //add this line :
     set_links(proc);
 
     local_intr_restore(tmp);
@@ -635,7 +638,7 @@ load_icode(unsigned char *binary, size_t size) {
     //(6) setup trapframe for user environment
     struct trapframe *tf = current->tf;
     memset(tf, 0, sizeof(struct trapframe));
-    /* LAB5:EXERCISE1 YOUR CODE
+    /* LAB5:EXERCISE1 2014011433
      * should set tf_cs,tf_ds,tf_es,tf_ss,tf_esp,tf_eip,tf_eflags
      * NOTICE: If we set trapframe correctly, then the user level process can return to USER MODE from kernel. So
      *          tf_cs should be USER_CS segment (see memlayout.h)
@@ -644,6 +647,12 @@ load_icode(unsigned char *binary, size_t size) {
      *          tf_eip should be the entry point of this binary program (elf->e_entry)
      *          tf_eflags should be set to enable computer to produce Interrupt
      */
+    tf->tf_cs = USER_CS;
+    tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
+    tf->tf_esp = USTACKTOP;
+    tf->tf_eip = elf->e_entry;
+    //tf->tf_eflags = 1;
+    tf->tf_eflags = FL_IF;
     ret = 0;
 out:
     return ret;
