@@ -48,5 +48,7 @@ void sched_init(void);
 void wakeup_proc(struct proc_struct *proc);
 void schedule(void);
 
+void run_timer_list(struct proc_struct *proc);
+
 #endif /* !__KERN_SCHEDULE_SCHED_H__ */
 

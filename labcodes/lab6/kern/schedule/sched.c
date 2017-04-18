@@ -98,3 +98,8 @@ schedule(void) {
     }
     local_intr_restore(intr_flag);
 }
+
+void
+run_timer_list(struct proc_struct *proc) {
+    sched_class_proc_tick(proc);
+}
