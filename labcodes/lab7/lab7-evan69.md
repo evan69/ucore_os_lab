@@ -346,10 +346,10 @@ ucore中管程数据结构monitor_t的定义如下：
 
 答：在phi_take_forks_condvar函数中，我有这样一段代码：
 
-	 if(state_condvar[i] != EATING)
-     {
-        cond_wait(&(mtp->cv[i]));
-     }
+	if(state_condvar[i] != EATING)
+	{
+		cond_wait(&(mtp->cv[i]));
+	}
 
 而答案的实现为：
 
@@ -357,7 +357,7 @@ ucore中管程数据结构monitor_t的定义如下：
 		cond_wait(mtp->cv + i);
 	}
 
-我认为我的更加合理，并且也能通过make grade测试。
+我认为我的实现也有道理，并且也能通过make grade测试。
 
 ## LAB7运行结果
 
