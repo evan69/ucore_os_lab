@@ -148,7 +148,7 @@ alloc_proc(void) {
       proc->lab6_run_pool.left = proc->lab6_run_pool.right = proc->lab6_run_pool.parent = NULL;
       proc->lab6_stride = 0;
       proc->lab6_priority = 0;
-      
+
     //LAB8:EXERCISE2 2014011433 HINT:need add some code to init fs in proc_struct, ...
       proc->filesp = NULL;
     }
@@ -638,6 +638,211 @@ load_icode(int fd, int argc, char **kargv) {
      * (7) setup trapframe for user environment
      * (8) if up steps failed, you should cleanup the env.
      */
+    assert(argc >= 0 && argc <= EXEC_MAX_ARG_NUM);
+
+    //新建mm
+    if (current->mm != NULL)
+    {
+        panic("load_icode: current->mm must be empty.\n");
+    }
+
+    int ret = -E_NO_MEM;
+    struct mm_struct *mm;
+    if ((mm = mm_create()) == NULL)
+    {
+        goto bad_mm;
+    }
+
+    //建立页目录表
+    if (setup_pgdir(mm) != 0)
+    {
+        goto bad_pgdir_cleanup_mm;
+    }
+
+    struct Page *page;
+
+    //将文件从硬盘加载到内存
+    struct elfhdr __elf, *elf = &__elf;
+
+    //读elf文件头
+    if ((ret = load_icode_read(fd, elf, sizeof(struct elfhdr), 0)) != 0)
+    {
+        goto bad_elf_cleanup_pgdir;
+    }
+
+    if (elf->e_magic != ELF_MAGIC)
+    {
+        ret = -E_INVAL_ELF;
+        goto bad_elf_cleanup_pgdir;
+    }
+
+    //读elf文件头中的所有程序头
+    struct proghdr __ph, *ph = &__ph;
+    uint32_t vm_flags, perm, phnum;
+    for (phnum = 0; phnum < elf->e_phnum; phnum ++)
+    {
+        off_t phoff = elf->e_phoff + sizeof(struct proghdr) * phnum;//当前读到的程序头在文件中的偏移量
+
+        if ((ret = load_icode_read(fd, ph, sizeof(struct proghdr), phoff)) != 0)
+        {
+            //读程序头
+            goto bad_cleanup_mmap;
+        }
+        if (ph->p_type != ELF_PT_LOAD)
+        {
+            //判断该程序头描述的段是否可装载
+            continue ;
+        }
+        if (ph->p_filesz > ph->p_memsz)
+        {
+            ret = -E_INVAL_ELF;
+            goto bad_cleanup_mmap;
+        }
+        if (ph->p_filesz == 0)
+        {
+            //若该程序头描述的段的大小为0，继续读下一个程序头
+            continue ;
+        }
+
+        //建立程序头的地址映射
+        vm_flags = 0, perm = PTE_U;
+        //设置标志位
+        if (ph->p_flags & ELF_PF_X) vm_flags |= VM_EXEC;
+        if (ph->p_flags & ELF_PF_W) vm_flags |= VM_WRITE;
+        if (ph->p_flags & ELF_PF_R) vm_flags |= VM_READ;
+        if (vm_flags & VM_WRITE) perm |= PTE_W;
+        if ((ret = mm_map(mm, ph->p_va, ph->p_memsz, vm_flags, NULL)) != 0)
+        {
+            goto bad_cleanup_mmap;
+        }
+        off_t offset = ph->p_offset;
+        size_t off, size;
+        uintptr_t start = ph->p_va, end, la = ROUNDDOWN(start, PGSIZE);
+        //la为start的PGSIZE对齐处
+
+        //复制程序头对应的段
+        ret = -E_NO_MEM;
+
+        //复制p_filesz（text/data）
+        end = ph->p_va + ph->p_filesz;
+        while (start < end)
+        {
+            if ((page = pgdir_alloc_page(mm->pgdir, la, perm)) == NULL)
+            {
+                ret = -E_NO_MEM;
+                goto bad_cleanup_mmap;
+            }
+            off = start - la, size = PGSIZE - off, la += PGSIZE;
+            if (end < la)
+            {
+                size -= la - end;
+            }
+            if ((ret = load_icode_read(fd, page2kva(page) + off, size, offset)) != 0)
+            {
+                goto bad_cleanup_mmap;
+            }
+            start += size, offset += size;
+        }
+
+        //p_memsz（bss）开始时未对齐部分初始化
+        end = ph->p_va + ph->p_memsz;
+        if (start < la)
+        {
+            if (start == end)
+            {
+                continue ;
+            }
+            off = start + PGSIZE - la, size = PGSIZE - off;
+            if (end < la)
+            {
+                size -= la - end;
+            }
+            memset(page2kva(page) + off, 0, size);
+            start += size;
+            assert((end < la && start == end) || (end >= la && start == la));
+        }
+
+        //p_memsz（bss）对齐部分初始化
+        while (start < end)
+        {
+            if ((page = pgdir_alloc_page(mm->pgdir, la, perm)) == NULL)
+            {
+                ret = -E_NO_MEM;
+                goto bad_cleanup_mmap;
+            }
+            off = start - la, size = PGSIZE - off, la += PGSIZE;
+            if (end < la)
+            {
+                size -= la - end;
+            }
+            memset(page2kva(page) + off, 0, size);
+            start += size;
+        }
+    }
+
+    sysfile_close(fd);
+    //关闭文件
+
+
+    //建立用户栈的内存映射
+    vm_flags = VM_READ | VM_WRITE | VM_STACK;
+    if ((ret = mm_map(mm, USTACKTOP - USTACKSIZE, USTACKSIZE, vm_flags, NULL)) != 0)
+    {
+        goto bad_cleanup_mmap;
+    }
+    assert(pgdir_alloc_page(mm->pgdir, USTACKTOP-PGSIZE , PTE_USER) != NULL);
+    assert(pgdir_alloc_page(mm->pgdir, USTACKTOP-2*PGSIZE , PTE_USER) != NULL);
+    assert(pgdir_alloc_page(mm->pgdir, USTACKTOP-3*PGSIZE , PTE_USER) != NULL);
+    assert(pgdir_alloc_page(mm->pgdir, USTACKTOP-4*PGSIZE , PTE_USER) != NULL);
+    
+    //设置当前进程的mm、cr3（页目录表基址）
+    mm_count_inc(mm);
+    current->mm = mm;
+    current->cr3 = PADDR(mm->pgdir);
+    lcr3(PADDR(mm->pgdir));
+
+    uint32_t argv_size=0, i;
+    //计算所有参数的长度和
+    for (i = 0; i < argc; i ++)
+    {
+        argv_size += strnlen(kargv[i],EXEC_MAX_ARG_LEN + 1)+1;
+    }
+
+    uintptr_t stacktop = USTACKTOP - (argv_size/sizeof(long)+1)*sizeof(long);
+    char** uargv=(char **)(stacktop  - argc * sizeof(char *));
+    
+    argv_size = 0;
+    //将传进的参数依次放入用户栈
+    for (i = 0; i < argc; i ++) 
+    {
+        uargv[i] = strcpy((char *)(stacktop + argv_size ), kargv[i]);
+        argv_size +=  strnlen(kargv[i],EXEC_MAX_ARG_LEN + 1)+1;
+    }
+    
+    stacktop = (uintptr_t)uargv - sizeof(int);
+    *(int *)stacktop = argc;
+    
+    //设置中断帧，这样从中断返回时即可开始执行从elf文件中载入的内容
+    struct trapframe *tf = current->tf;
+    memset(tf, 0, sizeof(struct trapframe));
+    tf->tf_cs = USER_CS;
+    tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
+    tf->tf_esp = stacktop;
+    tf->tf_eip = elf->e_entry;//第一条指令
+    tf->tf_eflags = FL_IF;
+    ret = 0;
+
+    //错误处理，恢复之前的状态
+out:
+    return ret;
+bad_cleanup_mmap:
+    exit_mmap(mm);
+bad_elf_cleanup_pgdir:
+    put_pgdir(mm);
+bad_pgdir_cleanup_mm:
+    mm_destroy(mm);
+bad_mm:
+    goto out;
 }
 
 // this function isn't very correct in LAB8
